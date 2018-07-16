@@ -1,7 +1,9 @@
-package uk.co.paulcowie.bbfctracker.twitter
+package uk.co.paulcowie.bbfctracker.films
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import javax.persistence.*
+import javax.persistence.Entity
+import javax.persistence.Id
+import javax.persistence.ManyToMany
 
 @Entity
 data class RatingReason (
@@ -10,5 +12,5 @@ data class RatingReason (
 
     @JsonIgnore
     @ManyToMany(mappedBy = "reasons")
-    lateinit var films: Set<BbfcTweet>
+    lateinit var films: Set<Film>
 }

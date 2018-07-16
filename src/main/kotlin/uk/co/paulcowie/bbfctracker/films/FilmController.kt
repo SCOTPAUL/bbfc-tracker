@@ -1,17 +1,15 @@
 package uk.co.paulcowie.bbfctracker.films
 
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.context.annotation.Bean
+import org.springframework.format.annotation.DateTimeFormat
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import uk.co.paulcowie.bbfctracker.twitter.BbfcTweet
-import uk.co.paulcowie.bbfctracker.twitter.RatingReason
-import uk.co.paulcowie.bbfctracker.twitter.ReasonRepository
-import uk.co.paulcowie.bbfctracker.twitter.TweetRepository
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import javax.persistence.EntityManager
-import javax.persistence.Persistence
-import javax.persistence.TypedQuery
 import javax.persistence.criteria.Predicate
 
 @RestController
@@ -19,14 +17,14 @@ import javax.persistence.criteria.Predicate
 class FilmController {
 
     @Autowired
-    private lateinit var repo: TweetRepository
+    private lateinit var repo: FilmRepository
 
     @Autowired
     private lateinit var entityManager: EntityManager
 
 
     @RequestMapping("/rating")
-    fun filmByType(@RequestParam(value = "q", required = true) rating: String): Iterable<BbfcTweet> {
+    fun filmByType(@RequestParam(value = "q", required = true) rating: String): Iterable<Film> {
         val formattedRating = rating.toUpperCase()
 
         return if(formattedRating.isNotBlank()) {
@@ -38,7 +36,7 @@ class FilmController {
     }
 
     @RequestMapping("/reasons-contain")
-    fun filmByReasons(@RequestParam(value = "q", required = true) reason: String): Iterable<BbfcTweet> {
+    fun filmByReasons(@RequestParam(value = "q", required = true) reason: String): Iterable<Film> {
         val formattedReason = reason.toLowerCase()
 
         return if(formattedReason.isNotBlank()) {
@@ -52,28 +50,47 @@ class FilmController {
     @RequestMapping("/all")
     fun films(@RequestParam(value = "reason", required = false) reason: String?,
               @RequestParam(value = "rating", required = false) rating: String?,
-              @RequestParam(value = "name", required = false) name: String?): List<BbfcTweet> {
+              @RequestParam(value = "name", required = false) name: String?,
+
+              @RequestParam(value = "before", required = false)
+              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) before: LocalDate?,
+
+              @RequestParam(value = "after", required = false)
+              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) after: LocalDate?): List<Film> {
         val formattedReason = reason?.toLowerCase()
         val formattedRating = rating?.toUpperCase()
         val formattedName = name?.toUpperCase()
 
         val cb = entityManager.criteriaBuilder
-        val cq = cb.createQuery(BbfcTweet::class.java)
+        val cq = cb.createQuery(Film::class.java)
         cq.distinct(true)
-        val e = cq.from(BbfcTweet::class.java)
+        val e = cq.from(Film::class.java)
         cq.select(e)
 
         val preds = mutableListOf<Predicate>()
 
         if(!formattedReason.isNullOrBlank()){
-            val join = e.join<BbfcTweet, RatingReason>("reasons")
+            val join = e.join<Film, RatingReason>("reasons")
             preds.add(cb.and(cb.like(join.get("reason"), "%$formattedReason%")))
         }
         if(!formattedRating.isNullOrBlank()){
             preds.add(cb.and(cb.equal(e.get<String>("rating"), formattedRating)))
         }
         if(!formattedName.isNullOrBlank()){
-            preds.add(cb.and(cb.equal(e.get<String>("film"), formattedName)))
+            preds.add(cb.and(cb.equal(e.get<String>("name"), formattedName)))
+        }
+
+        if(before != null && after != null && before.isBefore(after)){
+            throw HttpMessageNotReadableException("Argument 'before' cannot be before 'after'")
+        }
+
+        before?.let {
+            preds.add(cb.and(cb.lessThanOrEqualTo(e.get<Instant>("createdAt"),
+                    it.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC))))
+        }
+        after?.let {
+            preds.add(cb.and(cb.greaterThanOrEqualTo(e.get<Instant>("createdAt"),
+                    it.atStartOfDay().toInstant(ZoneOffset.UTC))))
         }
 
         cq.where(*preds.toTypedArray())
