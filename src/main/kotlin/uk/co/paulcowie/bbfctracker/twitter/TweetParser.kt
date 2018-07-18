@@ -6,7 +6,7 @@ import uk.co.paulcowie.bbfctracker.films.RatingReason
 import java.util.regex.Pattern
 
 object TweetParser {
-    private val PATTERN = Pattern.compile("^(.+) \\(([A-Z0-9]+)\\) (.+?)(?: https?:.+)?\$")
+    private val PATTERN = Pattern.compile("^(.+) \\((U|PG|12|12A|15|18)\\) (.+?)(?: https?:.+)?\$")
 
     fun parse(status: Status): Film? {
         if(status.inReplyToUserId != -1L || status.isRetweet){
@@ -25,6 +25,11 @@ object TweetParser {
         }
 
         val filmName = matches.group(1)
+
+        if(filmName.startsWith("VOD:") || filmName.toUpperCase() != filmName || (filmName.length > 1 && filmName[1].isLowerCase())){
+            return null
+        }
+
         val rating = matches.group(2)
 
         val reasonStrings = matches.group(3)

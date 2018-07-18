@@ -38,17 +38,28 @@ class FilmController: ApplicationListener<TweetRetrievalEvent> {
         markovChain.update(repo.findAll())
     }
 
+    private fun makeFilmName(): String {
+        var filmName: String
+
+        do {
+            filmName = markovChain
+                    .joinToString(" ")
+                    .replace(" ([:'!?,.’]+) ?".toRegex(), "$1")
+                    .replace("([:,.!?]+)".toRegex(), "$1 ")
+                    .trim()
+
+        } while (filmName.split(" ").size == 1 || repo.findFirstByName(filmName) != null)
+
+        return filmName
+    }
+
     @RequestMapping("/generate-random")
     fun generateFilmName(@RequestParam(value = "n", required = false) num: Int?): List<String> {
+        val threshNum = (if(num != null && num > 500) 500 else num) ?: 1
         val names = mutableListOf<String>()
 
-        if(num != null){
-            for(i in 0..num){
-                names.add(markovChain.joinToString(" ").trim())
-            }
-        }
-        else {
-            names.add(markovChain.joinToString(" ").trim())
+        for(i in 1..threshNum){
+            names.add(makeFilmName())
         }
 
         return names

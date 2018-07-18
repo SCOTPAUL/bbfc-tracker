@@ -25,8 +25,6 @@ class MarkovChain(private var films: Iterable<Film>): Iterable<String> {
         val transitionCount = mutableMapOf<String, MutableMap<String, Int>>()
 
         for(film in films){
-
-
             val filmName = film.name
 
             val split = filmName
@@ -34,12 +32,12 @@ class MarkovChain(private var films: Iterable<Film>): Iterable<String> {
                     .filterNot { it.isBlank() }
                     .map { it.trim() }
 
-            split.firstOrNull()?.let { startWords.add(it) }
 
             split.forEachIndexed { index, s ->
                 if(index != 0){
                     val sPrev = split[index - 1]
 
+                    split.firstOrNull()?.let { startWords.add(it) }
                     val prevCount = transitionCount.getOrPut(sPrev, { mutableMapOf() }).getOrDefault(s, 0)
                     transitionCount[sPrev]!![s] = prevCount + 1
                 }
@@ -80,7 +78,7 @@ class MarkovChain(private var films: Iterable<Film>): Iterable<String> {
 
         val p = Math.random()
 
-        var cumulativeProb = 0.0
+        var cumulativeProb = 1e-10
 
         for((possibility, prob) in possibilities){
             cumulativeProb += prob
@@ -89,7 +87,7 @@ class MarkovChain(private var films: Iterable<Film>): Iterable<String> {
             }
         }
 
-        return possibilities.keys.last()
+        throw IllegalStateException("Error with floating point addition")
     }
 
 }
