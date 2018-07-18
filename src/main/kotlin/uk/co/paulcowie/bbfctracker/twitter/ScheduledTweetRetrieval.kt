@@ -2,6 +2,8 @@ package uk.co.paulcowie.bbfctracker.twitter
 
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationEvent
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import twitter4j.Paging
@@ -22,6 +24,9 @@ class ScheduledTweetRetrieval {
     }
 
     private lateinit var twitter: Twitter
+
+    @Autowired
+    private lateinit var publisher: ApplicationEventPublisher
 
     @Autowired
     private lateinit var repo: FilmRepository
@@ -77,5 +82,9 @@ class ScheduledTweetRetrieval {
         repo.saveAll(parsed)
 
         log.info("Got ${parsed.size} tweets")
+
+        publisher.publishEvent(TweetRetrievalEvent(parsed))
     }
 }
+
+class TweetRetrievalEvent(newFilms: List<Film>) : ApplicationEvent(newFilms)

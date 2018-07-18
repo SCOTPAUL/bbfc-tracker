@@ -1,11 +1,15 @@
 package uk.co.paulcowie.bbfctracker.films
 
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.context.ApplicationListener
+import org.springframework.context.annotation.Bean
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import uk.co.paulcowie.bbfctracker.films.ml.MarkovChain
+import uk.co.paulcowie.bbfctracker.twitter.TweetRetrievalEvent
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -14,13 +18,41 @@ import javax.persistence.criteria.Predicate
 
 @RestController
 @RequestMapping("/films")
-class FilmController {
+class FilmController: ApplicationListener<TweetRetrievalEvent> {
 
     @Autowired
     private lateinit var repo: FilmRepository
 
     @Autowired
     private lateinit var entityManager: EntityManager
+
+    @Autowired
+    private lateinit var markovChain: MarkovChain
+
+    @Bean
+    fun markovChain(repo: FilmRepository): MarkovChain {
+        return MarkovChain(repo.findAll())
+    }
+
+    override fun onApplicationEvent(event: TweetRetrievalEvent) {
+        markovChain.update(repo.findAll())
+    }
+
+    @RequestMapping("/generate-random")
+    fun generateFilmName(@RequestParam(value = "n", required = false) num: Int?): List<String> {
+        val names = mutableListOf<String>()
+
+        if(num != null){
+            for(i in 0..num){
+                names.add(markovChain.joinToString(" ").trim())
+            }
+        }
+        else {
+            names.add(markovChain.joinToString(" ").trim())
+        }
+
+        return names
+    }
 
 
     @RequestMapping("/rating")
